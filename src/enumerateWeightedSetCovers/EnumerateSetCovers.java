@@ -78,6 +78,14 @@ public class EnumerateSetCovers {
 		}
 	}
 	
+	private void addAllSets(Solution sol, BitSet sets) {
+		
+		for (int i = sets.nextSetBit(0) ; i != -1 ; i = sets.nextSetBit(i+1)) {
+			sol.addSet(i, problem.getWeight(i));
+		}
+	}
+
+	
 	// process an entry that has been removed from Q1
 	private void dealWithQ1Entry(QueueEntry entry, PriorityQueue<QueueEntry> pq, boolean nonRedundant) {
 		
@@ -104,10 +112,7 @@ public class EnumerateSetCovers {
 			
 			if (newSolution != null) {
 				
-				for (int j = second.nextSetBit(0) ; j != -1 ; j = second.nextSetBit(j+1)) {
-					newSolution.addSet(j, problem.getWeight(j));
-				}
-
+				addAllSets(newSolution, second);
 				QueueEntry newEntry = new QueueEntry(newSolution, second, third, true);
 				addToQueue(newEntry,pq);
 			}
@@ -134,13 +139,14 @@ public class EnumerateSetCovers {
 		HashSet<BitSet> printedAlready = new HashSet<BitSet>();
 		
 		Solution s = (new GreedyMinSetCover()).approxSetCover(problem); 
-					
+		boolean first = true;
+		
 		if (s != null) {
 			BitSet none = new BitSet(numOfSets);
 			BitSet all = new BitSet(numOfSets);
 			all.set(0, numOfSets);
-			if (nonRedundant) s = problem.makeNonRedundant(s, new BitSet());
-			StatisticsLogger.changeStat("firstWeight", s.getWeight());
+			//if (nonRedundant) s = problem.makeNonRedundant(s, new BitSet());
+			//StatisticsLogger.changeStat("firstWeight", s.getWeight());
 			addToQueue(new QueueEntry(s, none, all, true), pq);
 		}
 		
@@ -148,19 +154,22 @@ public class EnumerateSetCovers {
 		int bestScoreInInterval = Integer.MAX_VALUE;
 		
 		while (!pq.isEmpty()) {
-					
+			
 			QueueEntry entry = pq.poll();
 			
 			Solution newSolution = entry.sol;
 			boolean foundNew = true;
 			
 			if (nonRedundant) {
-				newSolution = problem.makeNonRedundant(newSolution, new BitSet());
-				if (printedAlready.contains(newSolution)) foundNew = false;
-				else printedAlready.add(newSolution.getSolution());
+				newSolution = problem.makeNonRedundant(entry.sol, new BitSet());
+				if (printedAlready.contains(newSolution.getSolution())) foundNew = false;
+				else {
+					printedAlready.add((BitSet)newSolution.getSolution().clone());
+				}
 			}
 			
 			if (foundNew) {
+			
 				numResults++;
 				if (newSolution.getWeight() < bestScoreInInterval) {
 					bestScoreInInterval = newSolution.getWeight();
@@ -168,7 +177,13 @@ public class EnumerateSetCovers {
 				
 				if (StatisticsLogger.minStat("lowestWeight", newSolution.getWeight()))
 					StatisticsLogger.changeStat("whenBestFound", numResults);
+				
+				if (first) {
+					StatisticsLogger.changeStat("firstWeight", newSolution.getWeight());	
+					first = false;
+				}
 			}
+			
 			
 			if (numResults % interval == 0 && bestScoreInInterval != Integer.MAX_VALUE) {
 				
@@ -232,6 +247,8 @@ public class EnumerateSetCovers {
 			System.out.println("Usage: java EnumerateSetCovers <input file> <num results> <nonRedundant?>");
 			System.exit(-1);
 		}
+		
+		StatisticsLogger.changeStat("interval", 500);
 		EnumerateSetCovers enumsc = new EnumerateSetCovers();
 		enumsc.enumerate(SetCoverProblemGenerator.generateSetCoverProblem(inp[0]), Integer.parseInt(inp[1]), Boolean.parseBoolean(inp[2]));
 		System.out.println("First Weight: " + StatisticsLogger.getStat("firstWeight"));
